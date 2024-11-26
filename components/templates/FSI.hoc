@@ -1,0 +1,100 @@
+begintemplate FSI_Cell
+	public soma, dend, type, Vinit, insert_mechs
+	create soma[1], dend[1]
+	strdef type
+
+	public noise, noiseRandObj
+	objref noise, noiseRandObj
+	public all, somatic, basal, apical, axonal
+	objref all, somatic, basal, apical, axonal
+
+	proc init() {
+		type = "FSI_Cell"
+
+		/////// parameters ///////
+		Vinit = -70 // initial potential
+		RaAll = 150
+		Cm = 1 // (microF/cm2)
+		Rm = 12000 // (ohm-cm2)
+		eleak = -70
+		gleak = 1/Rm
+
+		/////// sections ///////
+		all = new SectionList()
+		somatic = new SectionList()
+		basal = new SectionList()
+		apical = new SectionList()
+
+		soma[0] all.append()
+		soma[0] somatic.append()
+		dend[0] all.append()
+		dend[0] basal.append()
+
+		/////// topology ////////
+		connect dend[0](0), soma[0](1)
+
+		/////// geometry ////////
+		// dendrites along z axis
+		Lsoma = 15.0
+		Ldend = 150.0
+		soma[0] {
+			diam = 15.0 nseg = 1
+			pt3dadd(0,0,-Lsoma/2,diam)
+			pt3dadd(0,0,Lsoma/2,diam)
+		}
+		dend[0] {
+			diam = 10 nseg = 1
+			pt3dadd(0,0,0,diam)
+			pt3dadd(0,0,Ldend,diam)
+		}
+
+		/////// biophysics //////
+		forall {
+			cm = Cm
+			Ra = RaAll
+
+			insert leak
+			el_leak = eleak
+			glbar_leak = gleak
+			insert nainter
+			mv_05_nainter = -35.5 // -18.5
+			hv_05_nainter = -39 // -29
+			mtau_inv_nainter = 8.4 // 2.1
+			htau_inv_nainter = 0.135 // 0.045
+			insert kdrinter
+			v_05_kdrinter = -36 // -19
+			tau_inv_kdrinter = 0.45 // 0.15
+
+			ena = 45 // (mV)
+			ek = -80 // (mV)
+			v = Vinit // initial potential
+		}
+		soma[0] {
+			gnabar_nainter = 0.035 // (siemens/cm2)
+			gkdrbar_kdrinter = 0.008 // (siemens/cm2)
+		}
+		dend[0] {
+			gnabar_nainter = 0.010 // (siemens/cm2)
+			gkdrbar_kdrinter = 0.003 // (siemens/cm2)
+		}
+
+		define_shape() // builtin fcn: fill in 3d info for sections defined by only L and diam, translate 3d points for consistency with their connections	
+	}
+
+	proc insert_mechs(){
+		randseed = $1
+		soma[0]{
+			noiseRandObj=new Random()
+			noiseRandObj.Random123(randseed)
+			noiseRandObj.normal(0,1)
+
+			soma noise = new Gfluct2(0.5)
+			noise.g_e0 = 0.001 //0.00121
+			noise.g_i0 = 0.004 //0.00573
+			noise.std_e = 0.00025 //0.00012
+			noise.std_i = 0.002 //0.00264
+
+			noise.setRandObj(noiseRandObj)
+		}
+	}
+endtemplate FSI_Cell
